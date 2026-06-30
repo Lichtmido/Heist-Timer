@@ -47,7 +47,7 @@
 <table id="table-jun"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-jun"></tbody></table>
 <table id="table-juu"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-juu"></tbody></table>
 
-<h2>WebHookURL</h2>
+<h3>WebHookURL</h3>
 <div class="webhook-area">
     <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
     <button onclick="saveWebhook()">保存</button>
@@ -90,14 +90,18 @@
             let list = [...heists];
             if (sortMode[cat] !== 'none') list.sort((a,b) => (!a.dateObj ? 1 : !b.dateObj ? -1 : a.dateObj - b.dateObj));
 
-            if (cat === 'all' && sortMode[cat] === 'global') {
-                list.forEach(h => appendRow(body, h, true));
+            if (cat === 'all') {
+                if (sortMode[cat] === 'global') {
+                    list.forEach(h => appendRow(body, h, true));
+                } else {
+                    ['jun', 'juu'].forEach(c => {
+                        body.innerHTML += `<tr><td colspan="5" class="cat-row">${c === 'jun' ? '■ 準重強盗' : '■ 重強盗'}</td></tr>`;
+                        list.filter(h => h.cat === c).forEach(h => appendRow(body, h, true));
+                    });
+                }
             } else {
-                const cats = (cat === 'all') ? ['jun', 'juu'] : [cat];
-                cats.forEach(c => {
-                    body.innerHTML += `<tr><td colspan="${cat === 'all' ? 5 : 4}" class="cat-row">${c === 'jun' ? '■ 準重強盗' : '■ 重強盗'}</td></tr>`;
-                    list.filter(h => h.cat === c).forEach(h => appendRow(body, h, cat === 'all'));
-                });
+                body.innerHTML += `<tr><td colspan="4" class="cat-row">${cat === 'jun' ? '■ 準重強盗' : '■ 重強盗'}</td></tr>`;
+                list.filter(h => h.cat === cat).forEach(h => appendRow(body, h, false));
             }
         });
         updateCopyText();
@@ -106,24 +110,27 @@
     function appendRow(body, h, showCat) {
         const index = heists.indexOf(h);
         const catTag = h.cat === 'jun' ? '準' : '重';
-        body.innerHTML += `<tr>
+        const row = document.createElement('tr');
+        row.innerHTML = `
             ${showCat ? `<td>${catTag}</td>` : ''}
-            <td>${h.name}</td><td><input type="number" id="input-${index}" placeholder="分"></td>
+            <td>${h.name}</td>
+            <td><input type="number" id="input-${index}" placeholder="分"></td>
             <td>${h.time || '--:--'}</td>
             <td><button class="set-btn" onclick="setTime(${index})">セット</button> <button class="reset-btn" onclick="resetRow(${index})">×</button></td>
-        </tr>`;
+        `;
+        body.appendChild(row);
     }
 
     function setTime(index) {
-        const val = document.getElementById(`input-${index}`).value;
+        const input = document.getElementById(`input-${index}`);
+        const val = input.value;
         const minutes = parseInt(val);
         if (!isNaN(minutes)) {
             const d = new Date();
             d.setMinutes(d.getMinutes() + minutes);
             heists[index].dateObj = d;
             heists[index].time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-            // render()を呼び出さず、入力フィールドの値をクリアするだけに留めます
-            document.getElementById(`input-${index}`).value = '';
+            input.value = '';
             render(); 
         }
     }
