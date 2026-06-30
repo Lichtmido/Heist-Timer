@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>受注時間計算機</title>
+    <style>
+        body { background-color: #1a1a1a; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
+        .controls { margin-bottom: 20px; }
+        .tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tab-btn { padding: 10px 20px; cursor: pointer; background: #333; color: white; border: none; }
+        .tab-btn.active { background: #555; }
+        table { width: 100%; border-collapse: collapse; display: none; margin-bottom: 20px; }
+        table.active { display: table; }
+        th, td { padding: 10px; border: 1px solid #444; text-align: center; }
+        input[type="number"] { width: 60px; background: #333; color: white; border: 1px solid #555; padding: 5px; }
+        button { cursor: pointer; padding: 5px 10px; }
+        .reset-all { background: #d9534f; color: white; border: none; }
+        .set-btn { background: #5cb85c; color: white; border: none; }
+        .reset-btn { background: #f0ad4e; color: white; border: none; }
+        .webhook-area { margin-top: 20px; padding: 10px; border: 1px solid #444; background: #222; }
+        input[type="text"] { width: 300px; background: #333; color: white; border: 1px solid #555; padding: 5px; }
+        .copy-area { margin-top: 20px; }
+        textarea { width: 100%; height: 150px; background: #222; color: #0f0; padding: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+
+<h2>受注時間計算機</h2>
+<div class="controls">
+    <button class="reset-all" onclick="resetAll()">全リセット</button>
+    <button onclick="sortHeists()">時刻順にソート</button>
+</div>
+
+<div class="tabs">
+    <button id="btn-all" class="tab-btn active" onclick="showTab('all')">全体</button>
+    <button id="btn-jun" class="tab-btn" onclick="showTab('jun')">準重強盗</button>
+    <button id="btn-juu" class="tab-btn" onclick="showTab('juu')">重強盗</button>
+</div>
+
+<table id="table-all" class="active">
+    <thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead>
+    <tbody id="body-all"></tbody>
+</table>
+
+<table id="table-jun">
+    <thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead>
+    <tbody id="body-jun"></tbody>
+</table>
+
+<table id="table-juu">
+    <thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead>
+    <tbody id="body-juu"></tbody>
+</table>
+
+<div class="webhook-area">
+    <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
+    <button onclick="saveWebhook()">保存</button>
+    <button onclick="sendToDiscord()">Discordへ送信</button>
+</div>
+
+<div class="copy-area">
+    <h3>コピペ用リスト</h3>
+    <textarea id="copyText" readonly></textarea>
+</div>
+
+<script>
+    const heists = [
+        { name: "パレト銀行", cat: "jun", catName: "準重強盗", time: null },
+        { name: "輸送機", cat: "jun", catName: "準重強盗", time: null },
+        { name: "ボブキャット", cat: "jun", catName: "準重強盗", time: null },
+        { name: "ナイトクラブ", cat: "jun", catName: "準重強盗", time: null },
+        { name: "軍事基地", cat: "jun", catName: "準重強盗", time: null },
+        { name: "飛行場", cat: "juu", catName: "重強盗", time: null },
+        { name: "オイルリグ", cat: "juu", catName: "重強盗", time: null },
+        { name: "客船", cat: "juu", catName: "重強盗", time: null },
+        { name: "ヒューメイン", cat: "juu", catName: "重強盗", time: null },
+        { name: "アーティファクト", cat: "juu", catName: "重強盗", time: null },
+        { name: "ユニオン", cat: "juu", catName: "重強盗", time: null },
+        { name: "パシフィック銀行", cat: "juu", catName: "重強盗", time: null }
+    ];
+
+    window.onload = () => {
+        document.getElementById('webhookUrl').value = localStorage.getItem('whUrl') || '';
+        render();
+    };
+
+    function saveWebhook() {
+        localStorage.setItem('whUrl', document.getElementById('webhookUrl').value);
+        alert('保存しました');
+    }
+
+    async function sendToDiscord() {
+        const url = localStorage.getItem('whUrl');
+        if (!url) { alert('URLを入力してください'); return; }
+        
+        const junHeists = heists.filter(h => h.cat === 'jun' && h.time);
+        const juuHeists = heists.filter(h => h.cat === 'juu' && h.time);
+
+        if (junHeists.length === 0 && juuHeists.length === 0) {
+            alert('送信できるデータがありません');
+            return;
+        }
+
+        let content = "**【強盗ミッション受注可能時間】**\n```bash\n";
+
+        if (junHeists.length > 0) {
+            content += "■準重強盗\n";
+            junHeists.forEach(h => {
+                const padding = " ".repeat(Math.max(0, 8 - h.name.length));
+                content += `・${h.name}${padding} [${h.time.replace(':', '時')}分]\n`;
+            });
+            content += "\n";
+        }
+
+        if (juuHeists.length > 0) {
+            content += "■重強盗\n";
+            juuHeists.forEach(h => {
+                const padding = " ".repeat(Math.max(0, 8 - h.name.length));
+                content += `・${h.name}${padding} [${h.time.replace(':', '時')}分]\n`;
+            });
+        }
+
+        content += "```";
+
+        try {
+            await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            });
+            alert('送信しました');
+        } catch (error) {
+            alert('送信に失敗しました');
+            console.error(error);
+        }
+    }
+
+    function showTab(cat) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('table').forEach(t => t.classList.remove('active'));
+        document.getElementById('btn-' + cat).classList.add('active');
+        document.getElementById('table-' + cat).classList.add('active');
+        render();
+    }
+
+    function render() {
+        ['all', 'jun', 'juu'].forEach(cat => {
+            const body = document.getElementById('body-' + cat);
+            body.innerHTML = '';
+            const filtered = (cat === 'all') ? heists : heists.filter(h => h.cat === cat);
+            filtered.forEach((h) => {
+                const originalIndex = heists.indexOf(h);
+                body.innerHTML += `<tr>
+                    <td>${h.name}</td>
+                    <td><input type="number" id="input-${originalIndex}" placeholder="分"></td>
+                    <td id="time-${originalIndex}">${h.time || '--:--'}</td>
+                    <td>
+                        <button class="set-btn" onclick="setTime(${originalIndex})">セット</button>
+                        <button class="reset-btn" onclick="resetRow(${originalIndex})">×</button>
+                    </td>
+                </tr>`;
+            });
+        });
+        generateCopyText();
+    }
+
+    function setTime(index) {
+        const val = document.getElementById(`input-${index}`).value;
+        const minutes = parseInt(val);
+        if (!isNaN(minutes)) {
+            const date = new Date();
+            date.setMinutes(date.getMinutes() + minutes);
+            heists[index].time = date.getHours().toString().padStart(2, '0') + ':' + 
+                                 date.getMinutes().toString().padStart(2, '0');
+            render();
+        }
+    }
+
+    function resetRow(index) {
+        heists[index].time = null;
+        render();
+    }
+
+    function resetAll() {
+        heists.forEach(h => h.time = null);
+        render();
+    }
+
+    function sortHeists() {
+        heists.sort((a, b) => {
+            if (!a.time && !b.time) return 0;
+            if (!a.time) return 1;
+            if (!b.time) return -1;
+            return a.time.localeCompare(b.time);
+        });
+        render();
+    }
+
+    function generateCopyText() {
+        const junHeists = heists.filter(h => h.cat === 'jun' && h.time);
+        const juuHeists = heists.filter(h => h.cat === 'juu' && h.time);
+
+        let text = "";
+        if (junHeists.length > 0) {
+            text += "■準重強盗\n";
+            text += junHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n') + "\n\n";
+        }
+        if (juuHeists.length > 0) {
+            text += "■重強盗\n";
+            text += juuHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n');
+        }
+
+        document.getElementById('copyText').value = text.trim() || '設定された時間はありません。';
+    }
+</script>
+</body>
+</html>
