@@ -153,7 +153,7 @@
     async function sendToDiscord() {
         const url = localStorage.getItem('whUrl');
         if (!url) return alert('URLを入力してください');
-        const content = "**【犯罪受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
+        const content = "**【強盗ミッション受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
         const lastMsgId = localStorage.getItem('lastMsgId');
 
         try {
@@ -175,15 +175,25 @@
                 localStorage.setItem('lastMsgId', data.id);
                 alert('送信しました');
             }
-        } catch (e) { alert('更新失敗'); }
+        } catch (e) { alert('更新失敗。Discord上で投稿が削除されている場合は「削除ボタン」でリセットしてください。'); }
     }
 
     async function fetchFromDiscord() {
         const url = localStorage.getItem('whUrl');
-        const lastMsgId = localStorage.getItem('lastMsgId');
-        if (!url || !lastMsgId) return alert('同期するメッセージが見つかりません');
+        let lastMsgId = localStorage.getItem('lastMsgId');
+
+        if (!lastMsgId) {
+            lastMsgId = prompt("現在保存されている同期用IDがありません。\nDiscord上のメッセージIDを入力してください:");
+            if (!lastMsgId) return;
+            localStorage.setItem('lastMsgId', lastMsgId);
+        }
+
         try {
             const response = await fetch(`${url}/messages/${lastMsgId}`);
+            if (!response.ok) {
+                localStorage.removeItem('lastMsgId');
+                throw new Error("メッセージが見つかりませんでした");
+            }
             const data = await response.json();
             const text = data.content;
             
@@ -200,7 +210,9 @@
             });
             render();
             alert('同期しました');
-        } catch (e) { alert('同期失敗'); }
+        } catch (e) { 
+            alert('同期失敗: ' + e.message); 
+        }
     }
 
     async function deleteDiscordMessage() {
