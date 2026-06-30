@@ -26,6 +26,7 @@
         .copy-area { margin-top: 20px; }
         textarea { width: 100%; height: 150px; background: #111; color: #0f0; padding: 10px; font-family: monospace; border: 1px solid #444; }
         .delete-btn { background: #b33939; color: white; margin-left: 10px; }
+        .sync-btn { background: #5a39b3; color: white; }
     </style>
 </head>
 <body>
@@ -48,11 +49,12 @@
 <table id="table-jun"><thead><tr><th>ミッション名</th><th>受注可能時間</th></tr></thead><tbody id="body-jun"></tbody></table>
 <table id="table-juu"><thead><tr><th>ミッション名</th><th>受注可能時間</th></tr></thead><tbody id="body-juu"></tbody></table>
 
-<h2>WebHookURL</h2>
+<h2>WebHook操作</h2>
 <div class="webhook-area">
     <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
     <button onclick="saveWebhook()">保存</button>
     <button onclick="sendToDiscord()">送信(上書き)</button>
+    <button class="sync-btn" onclick="fetchFromDiscord()">Discordから最新を取得</button>
     <button class="delete-btn" onclick="deleteDiscordMessage()">Discord上のメッセージを削除</button>
 </div>
 
@@ -173,14 +175,38 @@
                 localStorage.setItem('lastMsgId', data.id);
                 alert('送信しました');
             }
-        } catch (e) { alert('更新失敗。Discord上で投稿が削除されている場合は「削除ボタン」でリセットしてください。'); }
+        } catch (e) { alert('更新失敗'); }
+    }
+
+    async function fetchFromDiscord() {
+        const url = localStorage.getItem('whUrl');
+        const lastMsgId = localStorage.getItem('lastMsgId');
+        if (!url || !lastMsgId) return alert('同期するメッセージが見つかりません');
+        try {
+            const response = await fetch(`${url}/messages/${lastMsgId}`);
+            const data = await response.json();
+            const text = data.content;
+            
+            heists.forEach(h => {
+                const regex = new RegExp(`・${h.name} (\\d{2})時(\\d{2})分`);
+                const match = text.match(regex);
+                if (match) {
+                    h.time = `${match[1]}:${match[2]}`;
+                    const d = new Date();
+                    d.setHours(parseInt(match[1]));
+                    d.setMinutes(parseInt(match[2]));
+                    h.dateObj = d;
+                }
+            });
+            render();
+            alert('同期しました');
+        } catch (e) { alert('同期失敗'); }
     }
 
     async function deleteDiscordMessage() {
         const url = localStorage.getItem('whUrl');
         const lastMsgId = localStorage.getItem('lastMsgId');
         if (!url || !lastMsgId) return alert('削除するメッセージが見つかりません');
-        
         try {
             await fetch(`${url}/messages/${lastMsgId}`, { method: 'DELETE' });
             localStorage.removeItem('lastMsgId');
