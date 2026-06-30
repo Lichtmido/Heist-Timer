@@ -25,6 +25,7 @@
         input[type="text"] { width: 300px; background: #333; color: white; border: 1px solid #555; padding: 5px; }
         .copy-area { margin-top: 20px; }
         textarea { width: 100%; height: 150px; background: #111; color: #0f0; padding: 10px; font-family: monospace; border: 1px solid #444; }
+        .delete-btn { background: #b33939; color: white; margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -51,7 +52,8 @@
 <div class="webhook-area">
     <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
     <button onclick="saveWebhook()">保存</button>
-    <button onclick="sendToDiscord()">送信</button>
+    <button onclick="sendToDiscord()">送信(上書き)</button>
+    <button class="delete-btn" onclick="deleteDiscordMessage()">Discord上のメッセージを削除</button>
 </div>
 
 <div class="copy-area">
@@ -82,14 +84,11 @@
 
     function render() {
         document.getElementById('sortAllBtn').style.display = (currentTab === 'all') ? 'inline-block' : 'none';
-
         ['all', 'jun', 'juu'].forEach(cat => {
             const body = document.getElementById('body-' + cat);
             body.innerHTML = '';
-            
             let list = [...heists];
             if (sortMode[cat] !== 'none') list.sort((a,b) => (!a.dateObj ? 1 : !b.dateObj ? -1 : a.dateObj - b.dateObj));
-
             if (cat === 'all') {
                 if (sortMode[cat] === 'global') {
                     list.forEach(h => appendFullRow(body, h, true));
@@ -110,13 +109,7 @@
 
     function appendFullRow(body, h, showCat) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            ${showCat ? `<td>${h.cat === 'jun' ? '準' : '重'}</td>` : ''}
-            <td>${h.name}</td>
-            <td><input type="number" id="input-${h.id}" placeholder="分"></td>
-            <td>${h.time || '--:--'}</td>
-            <td><button class="set-btn" onclick="setTime(${h.id})">セット</button> <button class="reset-btn" onclick="resetRow(${h.id})">×</button></td>
-        `;
+        tr.innerHTML = `${showCat ? `<td>${h.cat === 'jun' ? '準' : '重'}</td>` : ''}<td>${h.name}</td><td><input type="number" id="input-${h.id}" placeholder="分"></td><td>${h.time || '--:--'}</td><td><button class="set-btn" onclick="setTime(${h.id})">セット</button> <button class="reset-btn" onclick="resetRow(${h.id})">×</button></td>`;
         body.appendChild(tr);
     }
 
@@ -133,11 +126,8 @@
         }
     }
 
-    function resetRow(id) { 
-        const target = heists.find(h => h.id === id);
-        target.time = null; target.dateObj = null; render(); 
-    }
-    function resetAll() { heists = initialData.map((h, i) => ({ ...h, id: i, time: null, dateObj: null })); sortMode = { all: 'none', jun: 'none', juu: 'none' }; render(); }
+    function resetRow(id) { const target = heists.find(h => h.id === id); target.time = null; target.dateObj = null; render(); }
+    function resetAll() { heists = initialData.map((h, i) => ({ ...h, id: i, time: null, dateObj: null })); localStorage.removeItem('lastMsgId'); sortMode = { all: 'none', jun: 'none', juu: 'none' }; render(); }
     function showTab(cat) { currentTab = cat; document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-' + cat)); document.querySelectorAll('table').forEach(t => t.classList.toggle('active', t.id === 'table-' + cat)); render(); }
     function sortTab() { sortMode[currentTab] = 'tab'; render(); }
     function sortAll() { sortMode[currentTab] = 'global'; render(); }
@@ -162,10 +152,40 @@
         const url = localStorage.getItem('whUrl');
         if (!url) return alert('URLを入力してください');
         const content = "**【強盗ミッション受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
+        const lastMsgId = localStorage.getItem('lastMsgId');
+
         try {
-            await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: content}) });
-            alert('送信しました');
-        } catch (e) { alert('送信失敗'); }
+            if (lastMsgId) {
+                const response = await fetch(`${url}/messages/${lastMsgId}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content: content})
+                });
+                if (!response.ok) throw new Error();
+                alert('更新しました');
+            } else {
+                const response = await fetch(`${url}?wait=true`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content: content})
+                });
+                const data = await response.json();
+                localStorage.setItem('lastMsgId', data.id);
+                alert('送信しました');
+            }
+        } catch (e) { alert('更新失敗。Discord上で投稿が削除されている場合は「削除ボタン」でリセットしてください。'); }
+    }
+
+    async function deleteDiscordMessage() {
+        const url = localStorage.getItem('whUrl');
+        const lastMsgId = localStorage.getItem('lastMsgId');
+        if (!url || !lastMsgId) return alert('削除するメッセージが見つかりません');
+        
+        try {
+            await fetch(`${url}/messages/${lastMsgId}`, { method: 'DELETE' });
+            localStorage.removeItem('lastMsgId');
+            alert('Discord上のメッセージを削除しました');
+        } catch (e) { alert('削除失敗'); }
     }
 </script>
 </body>
