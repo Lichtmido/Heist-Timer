@@ -9,18 +9,22 @@
         .tabs { display: flex; gap: 10px; margin-bottom: 10px; }
         .tab-btn { padding: 10px 20px; cursor: pointer; background: #333; color: white; border: none; }
         .tab-btn.active { background: #555; }
-        table { width: 100%; border-collapse: collapse; display: none; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; display: none; margin-bottom: 20px; background: #222; }
         table.active { display: table; }
         th, td { padding: 10px; border: 1px solid #444; text-align: center; }
-        input[type="number"] { width: 60px; background: #333; color: white; border: 1px solid #555; padding: 5px; }
+        .cat-row { background: #444; font-weight: bold; text-align: left; padding: 10px; }
+        input[type="number"] { width: 60px; background: #444; color: white; border: 1px solid #666; padding: 5px; }
         button { cursor: pointer; padding: 5px 10px; }
-        .reset-all { background: #d9534f; color: white; border: none; }
-        .set-btn { background: #5cb85c; color: white; border: none; }
-        .reset-btn { background: #f0ad4e; color: white; border: none; }
+        .reset-all { background: #d9534f; color: white; }
+        .sort-btn { background: #4a90e2; color: white; }
+        .sort-all-btn { background: #b33939; color: white; display: none; }
+        .undo-btn { background: #777; color: white; }
+        .set-btn { background: #5cb85c; color: white; }
+        .reset-btn { background: #f0ad4e; color: white; }
         .webhook-area { margin-top: 20px; padding: 15px; border: 1px solid #444; background: #222; }
         input[type="text"] { width: 300px; background: #333; color: white; border: 1px solid #555; padding: 5px; }
         .copy-area { margin-top: 20px; }
-        textarea { width: 100%; height: 150px; background: #222; color: #0f0; padding: 10px; font-family: monospace; }
+        textarea { width: 100%; height: 150px; background: #111; color: #0f0; padding: 10px; font-family: monospace; border: 1px solid #444; }
     </style>
 </head>
 <body>
@@ -28,7 +32,9 @@
 <h2>受注時間計算機</h2>
 <div class="controls">
     <button class="reset-all" onclick="resetAll()">全リセット</button>
-    <button onclick="sortHeists()">現在のタブを時刻順にソート</button>
+    <button class="sort-btn" onclick="sortTab()">タブ内ソート</button>
+    <button id="sortAllBtn" class="sort-all-btn" onclick="sortAll()">全体時刻順ソート</button>
+    <button class="undo-btn" onclick="undoSort()">ソート解除</button>
 </div>
 
 <div class="tabs">
@@ -37,14 +43,14 @@
     <button id="btn-juu" class="tab-btn" onclick="showTab('juu')">重強盗</button>
 </div>
 
-<table id="table-all" class="active"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-all"></tbody></table>
+<table id="table-all" class="active"><thead><tr><th>カテゴリ</th><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-all"></tbody></table>
 <table id="table-jun"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-jun"></tbody></table>
 <table id="table-juu"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-juu"></tbody></table>
 
 <div class="webhook-area">
     <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
     <button onclick="saveWebhook()">保存</button>
-    <button onclick="sendToDiscord()">現在のタブを送信</button>
+    <button onclick="sendToDiscord()">送信</button>
 </div>
 
 <div class="copy-area">
@@ -53,135 +59,105 @@
 </div>
 
 <script>
-    const heists = [
-        { name: "パレト銀行", cat: "jun", time: null },
-        { name: "輸送機", cat: "jun", time: null },
-        { name: "ボブキャット", cat: "jun", time: null },
-        { name: "ナイトクラブ", cat: "jun", time: null },
-        { name: "軍事基地", cat: "jun", time: null },
-        { name: "飛行場", cat: "juu", time: null },
-        { name: "オイルリグ", cat: "juu", time: null },
-        { name: "客船", cat: "juu", time: null },
-        { name: "ヒューメイン", cat: "juu", time: null },
-        { name: "アーティファクト", cat: "juu", time: null },
-        { name: "ユニオン", cat: "juu", time: null },
-        { name: "パシフィック銀行", cat: "juu", time: null }
+    const initialData = [
+        { name: "パレト銀行", cat: "jun", time: null, dateObj: null }, { name: "輸送機", cat: "jun", time: null, dateObj: null },
+        { name: "ボブキャット", cat: "jun", time: null, dateObj: null }, { name: "ナイトクラブ", cat: "jun", time: null, dateObj: null },
+        { name: "軍事基地", cat: "jun", time: null, dateObj: null }, { name: "飛行場", cat: "juu", time: null, dateObj: null },
+        { name: "オイルリグ", cat: "juu", time: null, dateObj: null }, { name: "客船", cat: "juu", time: null, dateObj: null },
+        { name: "ヒューメイン", cat: "juu", time: null, dateObj: null }, { name: "アーティファクト", cat: "juu", time: null, dateObj: null },
+        { name: "ユニオン", cat: "juu", time: null, dateObj: null }, { name: "パシフィック銀行", cat: "juu", time: null, dateObj: null }
     ];
 
+    let heists = JSON.parse(JSON.stringify(initialData));
     let currentTab = 'all';
+    let sortMode = { all: 'none', jun: 'none', juu: 'none' }; 
 
     window.onload = () => {
         document.getElementById('webhookUrl').value = localStorage.getItem('whUrl') || '';
         render();
     };
 
-    function saveWebhook() {
-        localStorage.setItem('whUrl', document.getElementById('webhookUrl').value);
-        alert('保存しました');
-    }
-
-    function getFilteredData() {
-        return (currentTab === 'all') ? heists : heists.filter(h => h.cat === currentTab);
-    }
-
-    async function sendToDiscord() {
-        const url = localStorage.getItem('whUrl');
-        if (!url) { alert('URLを入力してください'); return; }
-        
-        const activeHeists = getFilteredData().filter(h => h.time);
-
-        if (activeHeists.length === 0) {
-            alert('送信できるデータがありません');
-            return;
-        }
-
-        const title = (currentTab === 'all') ? "全ミッション一覧" : (currentTab === 'jun' ? "準重強盗リスト" : "重強盗リスト");
-        let content = `**【${title}】**\n\`\`\`bash\n`;
-        activeHeists.forEach(h => {
-            content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`;
-        });
-        content += "```";
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: content })
-            });
-            if (response.ok) alert('送信しました');
-            else alert('送信エラー: ' + response.status);
-        } catch (error) {
-            alert('ネットワークエラーが発生しました。');
-        }
-    }
-
-    function showTab(cat) {
-        currentTab = cat;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll('table').forEach(t => t.classList.remove('active'));
-        document.getElementById('btn-' + cat).classList.add('active');
-        document.getElementById('table-' + cat).classList.add('active');
-        render();
-    }
+    function saveWebhook() { localStorage.setItem('whUrl', document.getElementById('webhookUrl').value); alert('保存しました'); }
 
     function render() {
+        document.getElementById('sortAllBtn').style.display = (currentTab === 'all') ? 'inline-block' : 'none';
+
         ['all', 'jun', 'juu'].forEach(cat => {
             const body = document.getElementById('body-' + cat);
             body.innerHTML = '';
-            const filtered = (cat === 'all') ? heists : heists.filter(h => h.cat === cat);
-            filtered.forEach((h) => {
-                const originalIndex = heists.indexOf(h);
-                body.innerHTML += `<tr>
-                    <td>${h.name}</td>
-                    <td><input type="number" id="input-${originalIndex}" placeholder="分"></td>
-                    <td id="time-${originalIndex}">${h.time || '--:--'}</td>
-                    <td>
-                        <button class="set-btn" onclick="setTime(${originalIndex})">セット</button>
-                        <button class="reset-btn" onclick="resetRow(${originalIndex})">×</button>
-                    </td>
-                </tr>`;
-            });
+            
+            let list = [...heists];
+            if (sortMode[cat] !== 'none') list.sort((a,b) => (!a.dateObj ? 1 : !b.dateObj ? -1 : a.dateObj - b.dateObj));
+
+            if (cat === 'all' && sortMode[cat] === 'global') {
+                list.forEach(h => appendRow(body, h, true));
+            } else {
+                const cats = (cat === 'all') ? ['jun', 'juu'] : [cat];
+                cats.forEach(c => {
+                    body.innerHTML += `<tr><td colspan="${cat === 'all' ? 5 : 4}" class="cat-row">${c === 'jun' ? '■ 準重強盗' : '■ 重強盗'}</td></tr>`;
+                    list.filter(h => h.cat === c).forEach(h => appendRow(body, h, cat === 'all'));
+                });
+            }
         });
         updateCopyText();
+    }
+
+    function appendRow(body, h, showCat) {
+        const index = heists.indexOf(h);
+        const catTag = h.cat === 'jun' ? '準' : '重';
+        body.innerHTML += `<tr>
+            ${showCat ? `<td>${catTag}</td>` : ''}
+            <td>${h.name}</td><td><input type="number" id="input-${index}" placeholder="分"></td>
+            <td>${h.time || '--:--'}</td>
+            <td><button class="set-btn" onclick="setTime(${index})">セット</button> <button class="reset-btn" onclick="resetRow(${index})">×</button></td>
+        </tr>`;
     }
 
     function setTime(index) {
         const val = document.getElementById(`input-${index}`).value;
         const minutes = parseInt(val);
         if (!isNaN(minutes)) {
-            const date = new Date();
-            date.setMinutes(date.getMinutes() + minutes);
-            heists[index].time = date.getHours().toString().padStart(2, '0') + ':' + 
-                                 date.getMinutes().toString().padStart(2, '0');
-            render();
+            const d = new Date();
+            d.setMinutes(d.getMinutes() + minutes);
+            heists[index].dateObj = d;
+            heists[index].time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+            // render()を呼び出さず、入力フィールドの値をクリアするだけに留めます
+            document.getElementById(`input-${index}`).value = '';
+            render(); 
         }
     }
 
-    function resetRow(index) {
-        heists[index].time = null;
-        render();
-    }
-
-    function resetAll() {
-        heists.forEach(h => h.time = null);
-        render();
-    }
-
-    function sortHeists() {
-        // 現在表示中のカテゴリ内でのみソートを実行する
-        const data = getFilteredData();
-        data.sort((a, b) => {
-            if (!a.time && !b.time) return 0;
-            if (!a.time) return 1;
-            if (!b.time) return -1;
-            return a.time.localeCompare(b.time);
-        });
-        render();
-    }
+    function resetRow(index) { heists[index].time = null; heists[index].dateObj = null; render(); }
+    function resetAll() { heists = JSON.parse(JSON.stringify(initialData)); sortMode = { all: 'none', jun: 'none', juu: 'none' }; render(); }
+    function showTab(cat) { currentTab = cat; document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-' + cat)); document.querySelectorAll('table').forEach(t => t.classList.toggle('active', t.id === 'table-' + cat)); render(); }
+    function sortTab() { sortMode[currentTab] = 'tab'; render(); }
+    function sortAll() { sortMode[currentTab] = 'global'; render(); }
+    function undoSort() { sortMode[currentTab] = 'none'; render(); }
 
     function updateCopyText() {
-        const active = getFilteredData().filter(h => h.time);
-        document.getElementById('copyText').value = active.map(h => `${h.name} ${h.time.replace(':', '時')}分`).join('\n') || '設定された時間はありません。';
+        let content = "";
+        let list = (sortMode[currentTab] !== 'none') ? [...heists].sort((a,b) => (!a.dateObj ? 1 : !b.dateObj ? -1 : a.dateObj - b.dateObj)) : heists;
+        
+        const cats = currentTab === 'all' ? ['jun', 'juu'] : [currentTab];
+        cats.forEach(c => {
+            const filtered = list.filter(h => h.cat === c && h.time);
+            if(filtered.length > 0) {
+                if(sortMode[currentTab] !== 'global') content += (c === 'jun' ? "■準重強盗\n" : "■重強盗\n");
+                filtered.forEach(h => content += `・${h.name} ${h.time.replace(':', '時')}分\n`);
+                if(sortMode[currentTab] !== 'global') content += "\n";
+            }
+        });
+        document.getElementById('copyText').value = content.trim() || '時間未設定';
+    }
+
+    async function sendToDiscord() {
+        const url = localStorage.getItem('whUrl');
+        if (!url) return alert('URLを入力してください');
+        const content = "**【強盗ミッション受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
+        try {
+            await fetch(url, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content: content}) });
+            alert('送信しました');
+        } catch (e) { alert('送信失敗'); }
     }
 </script>
 </body>
