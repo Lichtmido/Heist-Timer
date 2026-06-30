@@ -37,25 +37,14 @@
     <button id="btn-juu" class="tab-btn" onclick="showTab('juu')">重強盗</button>
 </div>
 
-<table id="table-all" class="active">
-    <thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead>
-    <tbody id="body-all"></tbody>
-</table>
-
-<table id="table-jun">
-    <thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead>
-    <tbody id="body-jun"></tbody>
-</table>
-
-<table id="table-juu">
-    <thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead>
-    <tbody id="body-juu"></tbody>
-</table>
+<table id="table-all" class="active"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-all"></tbody></table>
+<table id="table-jun"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-jun"></tbody></table>
+<table id="table-juu"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-juu"></tbody></table>
 
 <div class="webhook-area">
     <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
     <button onclick="saveWebhook()">保存</button>
-    <button onclick="sendToDiscord()">Discordへ送信</button>
+    <button onclick="sendToDiscord()">現在のタブを送信</button>
 </div>
 
 <div class="copy-area">
@@ -79,6 +68,8 @@
         { name: "パシフィック銀行", cat: "juu", time: null }
     ];
 
+    let currentTab = 'all';
+
     window.onload = () => {
         document.getElementById('webhookUrl').value = localStorage.getItem('whUrl') || '';
         render();
@@ -89,28 +80,24 @@
         alert('保存しました');
     }
 
+    // 現在表示中のタブのデータのみを取得して送信
     async function sendToDiscord() {
         const url = localStorage.getItem('whUrl');
         if (!url) { alert('URLを入力してください'); return; }
         
-        const junHeists = heists.filter(h => h.cat === 'jun' && h.time);
-        const juuHeists = heists.filter(h => h.cat === 'juu' && h.time);
+        const filtered = (currentTab === 'all') ? heists : heists.filter(h => h.cat === currentTab);
+        const activeHeists = filtered.filter(h => h.time);
 
-        if (junHeists.length === 0 && juuHeists.length === 0) {
+        if (activeHeists.length === 0) {
             alert('送信できるデータがありません');
             return;
         }
 
-        let content = "**【強盗ミッション受注可能時間】**\n```bash\n";
-        if (junHeists.length > 0) {
-            content += "■準重強盗\n";
-            junHeists.forEach(h => content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`);
-            content += "\n";
-        }
-        if (juuHeists.length > 0) {
-            content += "■重強盗\n";
-            juuHeists.forEach(h => content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`);
-        }
+        const title = (currentTab === 'all') ? "強盗ミッション一覧" : (currentTab === 'jun' ? "準重強盗リスト" : "重強盗リスト");
+        let content = `**【${title}】**\n\`\`\`bash\n`;
+        activeHeists.forEach(h => {
+            content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`;
+        });
         content += "```";
 
         try {
@@ -119,18 +106,15 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: content })
             });
-            if (response.ok) {
-                alert('送信しました');
-            } else {
-                alert('送信エラー: ' + response.status);
-            }
+            if (response.ok) alert('送信しました');
+            else alert('送信エラー: ' + response.status);
         } catch (error) {
-            console.error(error);
-            alert('ネットワークエラーが発生しました。URLを確認してください。');
+            alert('ネットワークエラーが発生しました。');
         }
     }
 
     function showTab(cat) {
+        currentTab = cat;
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('table').forEach(t => t.classList.remove('active'));
         document.getElementById('btn-' + cat).classList.add('active');
@@ -156,7 +140,7 @@
                 </tr>`;
             });
         });
-        generateCopyText();
+        updateCopyText();
     }
 
     function setTime(index) {
@@ -191,17 +175,10 @@
         render();
     }
 
-    function generateCopyText() {
-        const junHeists = heists.filter(h => h.cat === 'jun' && h.time);
-        const juuHeists = heists.filter(h => h.cat === 'juu' && h.time);
-        let text = "";
-        if (junHeists.length > 0) {
-            text += "■準重強盗\n" + junHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n') + "\n\n";
-        }
-        if (juuHeists.length > 0) {
-            text += "■重強盗\n" + juuHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n');
-        }
-        document.getElementById('copyText').value = text.trim() || '設定された時間はありません。';
+    function updateCopyText() {
+        const filtered = (currentTab === 'all') ? heists : heists.filter(h => h.cat === currentTab);
+        const active = filtered.filter(h => h.time);
+        document.getElementById('copyText').value = active.map(h => `${h.name} ${h.time.replace(':', '時')}分`).join('\n') || '設定された時間はありません。';
     }
 </script>
 </body>
