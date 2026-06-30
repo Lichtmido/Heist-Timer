@@ -28,7 +28,7 @@
 <h2>受注時間計算機</h2>
 <div class="controls">
     <button class="reset-all" onclick="resetAll()">全リセット</button>
-    <button onclick="sortHeists()">時刻順にソート</button>
+    <button onclick="sortHeists()">現在のタブを時刻順にソート</button>
 </div>
 
 <div class="tabs">
@@ -80,20 +80,22 @@
         alert('保存しました');
     }
 
-    // 現在表示中のタブのデータのみを取得して送信
+    function getFilteredData() {
+        return (currentTab === 'all') ? heists : heists.filter(h => h.cat === currentTab);
+    }
+
     async function sendToDiscord() {
         const url = localStorage.getItem('whUrl');
         if (!url) { alert('URLを入力してください'); return; }
         
-        const filtered = (currentTab === 'all') ? heists : heists.filter(h => h.cat === currentTab);
-        const activeHeists = filtered.filter(h => h.time);
+        const activeHeists = getFilteredData().filter(h => h.time);
 
         if (activeHeists.length === 0) {
             alert('送信できるデータがありません');
             return;
         }
 
-        const title = (currentTab === 'all') ? "強盗ミッション一覧" : (currentTab === 'jun' ? "準重強盗リスト" : "重強盗リスト");
+        const title = (currentTab === 'all') ? "全ミッション一覧" : (currentTab === 'jun' ? "準重強盗リスト" : "重強盗リスト");
         let content = `**【${title}】**\n\`\`\`bash\n`;
         activeHeists.forEach(h => {
             content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`;
@@ -166,7 +168,9 @@
     }
 
     function sortHeists() {
-        heists.sort((a, b) => {
+        // 現在表示中のカテゴリ内でのみソートを実行する
+        const data = getFilteredData();
+        data.sort((a, b) => {
             if (!a.time && !b.time) return 0;
             if (!a.time) return 1;
             if (!b.time) return -1;
@@ -176,8 +180,7 @@
     }
 
     function updateCopyText() {
-        const filtered = (currentTab === 'all') ? heists : heists.filter(h => h.cat === currentTab);
-        const active = filtered.filter(h => h.time);
+        const active = getFilteredData().filter(h => h.time);
         document.getElementById('copyText').value = active.map(h => `${h.name} ${h.time.replace(':', '時')}分`).join('\n') || '設定された時間はありません。';
     }
 </script>
