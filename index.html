@@ -17,7 +17,7 @@
         .reset-all { background: #d9534f; color: white; border: none; }
         .set-btn { background: #5cb85c; color: white; border: none; }
         .reset-btn { background: #f0ad4e; color: white; border: none; }
-        .webhook-area { margin-top: 20px; padding: 10px; border: 1px solid #444; background: #222; }
+        .webhook-area { margin-top: 20px; padding: 15px; border: 1px solid #444; background: #222; }
         input[type="text"] { width: 300px; background: #333; color: white; border: 1px solid #555; padding: 5px; }
         .copy-area { margin-top: 20px; }
         textarea { width: 100%; height: 150px; background: #222; color: #0f0; padding: 10px; font-family: monospace; }
@@ -65,18 +65,18 @@
 
 <script>
     const heists = [
-        { name: "パレト銀行", cat: "jun", catName: "準重強盗", time: null },
-        { name: "輸送機", cat: "jun", catName: "準重強盗", time: null },
-        { name: "ボブキャット", cat: "jun", catName: "準重強盗", time: null },
-        { name: "ナイトクラブ", cat: "jun", catName: "準重強盗", time: null },
-        { name: "軍事基地", cat: "jun", catName: "準重強盗", time: null },
-        { name: "飛行場", cat: "juu", catName: "重強盗", time: null },
-        { name: "オイルリグ", cat: "juu", catName: "重強盗", time: null },
-        { name: "客船", cat: "juu", catName: "重強盗", time: null },
-        { name: "ヒューメイン", cat: "juu", catName: "重強盗", time: null },
-        { name: "アーティファクト", cat: "juu", catName: "重強盗", time: null },
-        { name: "ユニオン", cat: "juu", catName: "重強盗", time: null },
-        { name: "パシフィック銀行", cat: "juu", catName: "重強盗", time: null }
+        { name: "パレト銀行", cat: "jun", time: null },
+        { name: "輸送機", cat: "jun", time: null },
+        { name: "ボブキャット", cat: "jun", time: null },
+        { name: "ナイトクラブ", cat: "jun", time: null },
+        { name: "軍事基地", cat: "jun", time: null },
+        { name: "飛行場", cat: "juu", time: null },
+        { name: "オイルリグ", cat: "juu", time: null },
+        { name: "客船", cat: "juu", time: null },
+        { name: "ヒューメイン", cat: "juu", time: null },
+        { name: "アーティファクト", cat: "juu", time: null },
+        { name: "ユニオン", cat: "juu", time: null },
+        { name: "パシフィック銀行", cat: "juu", time: null }
     ];
 
     window.onload = () => {
@@ -102,36 +102,31 @@
         }
 
         let content = "**【強盗ミッション受注可能時間】**\n```bash\n";
-
         if (junHeists.length > 0) {
             content += "■準重強盗\n";
-            junHeists.forEach(h => {
-                const padding = " ".repeat(Math.max(0, 8 - h.name.length));
-                content += `・${h.name}${padding} [${h.time.replace(':', '時')}分]\n`;
-            });
+            junHeists.forEach(h => content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`);
             content += "\n";
         }
-
         if (juuHeists.length > 0) {
             content += "■重強盗\n";
-            juuHeists.forEach(h => {
-                const padding = " ".repeat(Math.max(0, 8 - h.name.length));
-                content += `・${h.name}${padding} [${h.time.replace(':', '時')}分]\n`;
-            });
+            juuHeists.forEach(h => content += `・${h.name.padEnd(8, ' ')} [${h.time.replace(':', '時')}分]\n`);
         }
-
         content += "```";
 
         try {
-            await fetch(url, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: content })
             });
-            alert('送信しました');
+            if (response.ok) {
+                alert('送信しました');
+            } else {
+                alert('送信エラー: ' + response.status);
+            }
         } catch (error) {
-            alert('送信に失敗しました');
             console.error(error);
+            alert('ネットワークエラーが発生しました。URLを確認してください。');
         }
     }
 
@@ -199,17 +194,13 @@
     function generateCopyText() {
         const junHeists = heists.filter(h => h.cat === 'jun' && h.time);
         const juuHeists = heists.filter(h => h.cat === 'juu' && h.time);
-
         let text = "";
         if (junHeists.length > 0) {
-            text += "■準重強盗\n";
-            text += junHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n') + "\n\n";
+            text += "■準重強盗\n" + junHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n') + "\n\n";
         }
         if (juuHeists.length > 0) {
-            text += "■重強盗\n";
-            text += juuHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n');
+            text += "■重強盗\n" + juuHeists.map(h => `・${h.name} ${h.time.replace(':', '時')}分`).join('\n');
         }
-
         document.getElementById('copyText').value = text.trim() || '設定された時間はありません。';
     }
 </script>
