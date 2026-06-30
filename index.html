@@ -38,16 +38,16 @@
 </div>
 
 <div class="tabs">
-    <button id="btn-all" class="tab-btn active" onclick="showTab('all')">全体</button>
+    <button id="btn-all" class="tab-btn active" onclick="showTab('all')">全体(入力用)</button>
     <button id="btn-jun" class="tab-btn" onclick="showTab('jun')">準重強盗</button>
     <button id="btn-juu" class="tab-btn" onclick="showTab('juu')">重強盗</button>
 </div>
 
 <table id="table-all" class="active"><thead><tr><th>カテゴリ</th><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-all"></tbody></table>
-<table id="table-jun"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-jun"></tbody></table>
-<table id="table-juu"><thead><tr><th>ミッション名</th><th>何分後</th><th>受注可能時間</th><th>操作</th></tr></thead><tbody id="body-juu"></tbody></table>
+<table id="table-jun"><thead><tr><th>ミッション名</th><th>受注可能時間</th></tr></thead><tbody id="body-jun"></tbody></table>
+<table id="table-juu"><thead><tr><th>ミッション名</th><th>受注可能時間</th></tr></thead><tbody id="body-juu"></tbody></table>
 
-<h3>WebHookURL</h3>
+<h2>WebHookURL</h2>
 <div class="webhook-area">
     <input type="text" id="webhookUrl" placeholder="Discord WebHook URL">
     <button onclick="saveWebhook()">保存</button>
@@ -61,15 +61,15 @@
 
 <script>
     const initialData = [
-        { name: "パレト銀行", cat: "jun", time: null, dateObj: null }, { name: "輸送機", cat: "jun", time: null, dateObj: null },
-        { name: "ボブキャット", cat: "jun", time: null, dateObj: null }, { name: "ナイトクラブ", cat: "jun", time: null, dateObj: null },
-        { name: "軍事基地", cat: "jun", time: null, dateObj: null }, { name: "飛行場", cat: "juu", time: null, dateObj: null },
-        { name: "オイルリグ", cat: "juu", time: null, dateObj: null }, { name: "客船", cat: "juu", time: null, dateObj: null },
-        { name: "ヒューメイン", cat: "juu", time: null, dateObj: null }, { name: "アーティファクト", cat: "juu", time: null, dateObj: null },
-        { name: "ユニオン", cat: "juu", time: null, dateObj: null }, { name: "パシフィック銀行", cat: "juu", time: null, dateObj: null }
+        { name: "パレト銀行", cat: "jun" }, { name: "輸送機", cat: "jun" },
+        { name: "ボブキャット", cat: "jun" }, { name: "ナイトクラブ", cat: "jun" },
+        { name: "軍事基地", cat: "jun" }, { name: "飛行場", cat: "juu" },
+        { name: "オイルリグ", cat: "juu" }, { name: "客船", cat: "juu" },
+        { name: "ヒューメイン", cat: "juu" }, { name: "アーティファクト", cat: "juu" },
+        { name: "ユニオン", cat: "juu" }, { name: "パシフィック銀行", cat: "juu" }
     ];
 
-    let heists = JSON.parse(JSON.stringify(initialData));
+    let heists = initialData.map((h, i) => ({ ...h, id: i, time: null, dateObj: null }));
     let currentTab = 'all';
     let sortMode = { all: 'none', jun: 'none', juu: 'none' }; 
 
@@ -92,51 +92,52 @@
 
             if (cat === 'all') {
                 if (sortMode[cat] === 'global') {
-                    list.forEach(h => appendRow(body, h, true));
+                    list.forEach(h => appendFullRow(body, h, true));
                 } else {
                     ['jun', 'juu'].forEach(c => {
                         body.innerHTML += `<tr><td colspan="5" class="cat-row">${c === 'jun' ? '■ 準重強盗' : '■ 重強盗'}</td></tr>`;
-                        list.filter(h => h.cat === c).forEach(h => appendRow(body, h, true));
+                        list.filter(h => h.cat === c).forEach(h => appendFullRow(body, h, true));
                     });
                 }
             } else {
-                body.innerHTML += `<tr><td colspan="4" class="cat-row">${cat === 'jun' ? '■ 準重強盗' : '■ 重強盗'}</td></tr>`;
-                list.filter(h => h.cat === cat).forEach(h => appendRow(body, h, false));
+                list.filter(h => h.cat === cat).forEach(h => {
+                    body.innerHTML += `<tr><td>${h.name}</td><td>${h.time || '--:--'}</td></tr>`;
+                });
             }
         });
         updateCopyText();
     }
 
-    function appendRow(body, h, showCat) {
-        const index = heists.indexOf(h);
-        const catTag = h.cat === 'jun' ? '準' : '重';
-        const row = document.createElement('tr');
-        row.innerHTML = `
-            ${showCat ? `<td>${catTag}</td>` : ''}
+    function appendFullRow(body, h, showCat) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            ${showCat ? `<td>${h.cat === 'jun' ? '準' : '重'}</td>` : ''}
             <td>${h.name}</td>
-            <td><input type="number" id="input-${index}" placeholder="分"></td>
+            <td><input type="number" id="input-${h.id}" placeholder="分"></td>
             <td>${h.time || '--:--'}</td>
-            <td><button class="set-btn" onclick="setTime(${index})">セット</button> <button class="reset-btn" onclick="resetRow(${index})">×</button></td>
+            <td><button class="set-btn" onclick="setTime(${h.id})">セット</button> <button class="reset-btn" onclick="resetRow(${h.id})">×</button></td>
         `;
-        body.appendChild(row);
+        body.appendChild(tr);
     }
 
-    function setTime(index) {
-        const input = document.getElementById(`input-${index}`);
-        const val = input.value;
-        const minutes = parseInt(val);
+    function setTime(id) {
+        const input = document.getElementById(`input-${id}`);
+        const minutes = parseInt(input.value);
         if (!isNaN(minutes)) {
             const d = new Date();
             d.setMinutes(d.getMinutes() + minutes);
-            heists[index].dateObj = d;
-            heists[index].time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-            input.value = '';
+            const target = heists.find(h => h.id === id);
+            target.dateObj = d;
+            target.time = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
             render(); 
         }
     }
 
-    function resetRow(index) { heists[index].time = null; heists[index].dateObj = null; render(); }
-    function resetAll() { heists = JSON.parse(JSON.stringify(initialData)); sortMode = { all: 'none', jun: 'none', juu: 'none' }; render(); }
+    function resetRow(id) { 
+        const target = heists.find(h => h.id === id);
+        target.time = null; target.dateObj = null; render(); 
+    }
+    function resetAll() { heists = initialData.map((h, i) => ({ ...h, id: i, time: null, dateObj: null })); sortMode = { all: 'none', jun: 'none', juu: 'none' }; render(); }
     function showTab(cat) { currentTab = cat; document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === 'btn-' + cat)); document.querySelectorAll('table').forEach(t => t.classList.toggle('active', t.id === 'table-' + cat)); render(); }
     function sortTab() { sortMode[currentTab] = 'tab'; render(); }
     function sortAll() { sortMode[currentTab] = 'global'; render(); }
@@ -145,7 +146,6 @@
     function updateCopyText() {
         let content = "";
         let list = (sortMode[currentTab] !== 'none') ? [...heists].sort((a,b) => (!a.dateObj ? 1 : !b.dateObj ? -1 : a.dateObj - b.dateObj)) : heists;
-        
         const cats = currentTab === 'all' ? ['jun', 'juu'] : [currentTab];
         cats.forEach(c => {
             const filtered = list.filter(h => h.cat === c && h.time);
