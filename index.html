@@ -151,7 +151,7 @@
     async function sendToDiscord() {
         const url = localStorage.getItem('whUrl');
         if (!url) return alert('URLを入力してください');
-        const content = "**【強盗ミッション受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
+        const content = "**【犯罪受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
         const lastMsgId = localStorage.getItem('lastMsgId');
 
         try {
