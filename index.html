@@ -59,7 +59,7 @@
 </div>
 
 <div class="copy-area">
-    <h3>コピペ用リスト</h3>
+    <h3>内容確認エリア</h3>
     <textarea id="copyText" readonly></textarea>
 </div>
 
@@ -85,6 +85,14 @@
     function saveWebhook() { localStorage.setItem('whUrl', document.getElementById('webhookUrl').value); alert('保存しました'); }
 
     function render() {
+        const now = new Date();
+        heists.forEach(h => {
+            if (h.dateObj && h.dateObj.getTime() < now.getTime()) {
+                h.time = null;
+                h.dateObj = null;
+            }
+        });
+
         document.getElementById('sortAllBtn').style.display = (currentTab === 'all') ? 'inline-block' : 'none';
         ['all', 'jun', 'juu'].forEach(cat => {
             const body = document.getElementById('body-' + cat);
@@ -147,12 +155,22 @@
                 if(sortMode[currentTab] !== 'global') content += "\n";
             }
         });
-        document.getElementById('copyText').value = content.trim() || 'データ無し';
+        document.getElementById('copyText').value = content.trim() || 'データがありません。\n\n犯罪禁止時間でない場合受注クールタイムの確認を行ってください。';
     }
 
     async function sendToDiscord() {
         const url = localStorage.getItem('whUrl');
         if (!url) return alert('URLを入力してください');
+
+        const now = new Date();
+        heists.forEach(h => {
+            if (h.dateObj && h.dateObj.getTime() < now.getTime()) {
+                h.time = null;
+                h.dateObj = null;
+            }
+        });
+        updateCopyText();
+
         const content = "**【犯罪受注可能時間】**\n```bash\n" + document.getElementById('copyText').value + "```";
         const lastMsgId = localStorage.getItem('lastMsgId');
 
@@ -181,38 +199,32 @@
     async function fetchFromDiscord() {
         const url = localStorage.getItem('whUrl');
         let lastMsgId = localStorage.getItem('lastMsgId');
-
         if (!lastMsgId) {
             lastMsgId = prompt("現在保存されている同期用IDがありません。\nDiscord上のメッセージIDを入力してください:");
             if (!lastMsgId) return;
             localStorage.setItem('lastMsgId', lastMsgId);
         }
-
         try {
             const response = await fetch(`${url}/messages/${lastMsgId}`);
-            if (!response.ok) {
-                localStorage.removeItem('lastMsgId');
-                throw new Error("メッセージが見つかりませんでした");
-            }
+            if (!response.ok) { localStorage.removeItem('lastMsgId'); throw new Error(); }
             const data = await response.json();
             const text = data.content;
-            
+            const now = new Date();
             heists.forEach(h => {
                 const regex = new RegExp(`・${h.name} (\\d{2})時(\\d{2})分`);
                 const match = text.match(regex);
                 if (match) {
-                    h.time = `${match[1]}:${match[2]}`;
                     const d = new Date();
                     d.setHours(parseInt(match[1]));
                     d.setMinutes(parseInt(match[2]));
-                    h.dateObj = d;
+                    d.setSeconds(0);
+                    if (d > now) { h.time = `${match[1]}:${match[2]}`; h.dateObj = d; }
+                    else { h.time = null; h.dateObj = null; }
                 }
             });
             render();
             alert('同期しました');
-        } catch (e) { 
-            alert('同期失敗: ' + e.message); 
-        }
+        } catch (e) { alert('同期失敗: ' + e.message); }
     }
 
     async function deleteDiscordMessage() {
